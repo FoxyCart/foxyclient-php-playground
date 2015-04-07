@@ -22,7 +22,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : '';
   <div class="container">
     <a class="navbar-brand" href="/">Foxy hAPI Coupon Builder Example</a>
     <ul class="nav navbar-nav">
-      <li><a href="/?action=">Home</a></li>
+      <li><a href="/coupons.php?action=">Home</a></li>
       <li><a target="_blank" href="https://api<?php print ($fc->getUseSandbox() ? '-sandbox' : ''); ?>.foxycart.com/hal-browser/browser.html">HAL Browser</a></li>
       <li><a href="/coupons.php?action=logout">Logout</a></li>
         <?php
@@ -228,38 +228,6 @@ if ($action == 'add_coupon') {
         'exclude_line_item_discounts' => $_POST['exclude_line_item_discounts'],
         'is_taxable' => $_POST['is_taxable'],
     );
-
-    // TODO: rmove this once we push out https://github.com/FoxyCart/hypermedia-api/pull/119
-    if ($data['start_date'] == '') {
-        unset($data['start_date']);
-    }
-    if ($data['end_date'] == '') {
-        unset($data['end_date']);
-    }
-
-    // TODO: rmove this once we push out https://github.com/FoxyCart/hypermedia-api/pull/120
-    if ($data['combinable'] == 'true') {
-        $data['combinable'] = true;
-    }
-    if ($data['multiple_codes_allowed'] == 'true') {
-        $data['multiple_codes_allowed'] = true;
-    }
-    if ($data['exclude_category_discounts'] == 'true') {
-        $data['exclude_category_discounts'] = true;
-    }
-    if ($data['exclude_line_item_discounts'] == 'true') {
-        $data['exclude_line_item_discounts'] = true;
-    }
-    if ($data['is_taxable'] == 'true') {
-        $data['is_taxable'] = true;
-    }
-
-/*
-    print "<pre>";
-    var_dump($data);
-    var_dump(http_build_query($data));
-    print "</pre>";
-*/
     $result = $fc->post($_SESSION['coupons_uri'],$data);
     $errors = array_merge($errors,$fc->getErrors($result));
     if (!count($errors)) {
@@ -279,6 +247,161 @@ if ($action == 'add_coupon') {
         print '</div>';
     }
 }
+
+
+if ($action == 'add_coupon_code') {
+    $errors = array();
+    if (!isset($_REQUEST['resource_creation_uri'])) {
+        $errors[] = 'The required resource_creation_uri is missing. Please click back and try again.';
+    }
+    if (!count($errors)) {
+        $data = array(
+            'code' => $_POST['code']
+        );
+        $result = $fc->post($_REQUEST['resource_creation_uri'],$data);
+        $errors = array_merge($errors,$fc->getErrors($result));
+        if (!count($errors)) {
+            print '<h3 class="alert alert-success" role="alert">Coupon Code Created</h3>';
+            $action = 'view_coupon';
+        }
+    }
+    if (count($errors)) {
+        $action = 'add_coupon_code_form';
+        print '<div class="alert alert-danger" role="alert">';
+        print '<h2>Error:</h2>';
+        foreach($errors as $error) {
+            print $error . '<br />';
+        }
+        print '</div>';
+    }
+}
+
+
+if ($action == 'add_multiple_coupon_codes') {
+    $errors = array();
+    if (!isset($_REQUEST['resource_creation_uri'])) {
+        $errors[] = 'The required resource_creation_uri is missing. Please click back and try again.';
+    }
+    if (!count($errors)) {
+        $codes = str_replace("\r", '', $_POST['codes']);
+        $data = array(
+            'coupon_codes' => explode("\n",$codes)
+        );
+        $result = $fc->post($_REQUEST['resource_creation_uri'],$data);
+        $errors = array_merge($errors,$fc->getErrors($result));
+        if (!count($errors)) {
+            print '<h3 class="alert alert-success" role="alert">Coupon Codes Created</h3>';
+            $action = 'view_coupon';
+        }
+    }
+    if (count($errors)) {
+        $action = 'add_coupon_code_form';
+        print '<div class="alert alert-danger" role="alert">';
+        print '<h2>Error:</h2>';
+        foreach($errors as $error) {
+            print $error . '<br />';
+        }
+        print '</div>';
+    }
+}
+
+if ($action == 'generate_multiple_coupon_codes') {
+    $errors = array();
+    if (!isset($_REQUEST['generate_codes_uri'])) {
+        $errors[] = 'The required generate_codes_uri is missing. Please click back and try again.';
+    }
+    if (!count($errors)) {
+        $data = array(
+            'length' => $_POST['length'],
+            'number_of_codes' => $_POST['number_of_codes'],
+            'prefix' => $_POST['prefix'],
+        );
+        $result = $fc->post($_REQUEST['generate_codes_uri'],$data);
+        $errors = array_merge($errors,$fc->getErrors($result));
+        if (!count($errors)) {
+            print '<h3 class="alert alert-success" role="alert">Coupon Codes Created</h3>';
+            $action = 'view_coupon';
+        }
+    }
+    if (count($errors)) {
+        $action = 'add_coupon_code_form';
+        print '<div class="alert alert-danger" role="alert">';
+        print '<h2>Error:</h2>';
+        foreach($errors as $error) {
+            print $error . '<br />';
+        }
+        print '</div>';
+    }
+}
+
+
+if ($action == 'add_coupon_code_form') {
+    ?>
+    <h2>Add Single Coupon Code</h2>
+    <form role="form" action="/coupons.php?action=add_coupon_code" method="post" class="form-horizontal">
+        <div class="form-group">
+            <label for="code" class="col-sm-2 control-label">Coupon Code<span class="text-danger">*</span></label>
+            <div class="col-sm-3">
+                <input type="text" class="form-control" id="code" name="code" maxlength="200" value="<?php echo isset($_POST['code']) ? htmlspecialchars($_POST['code']) : ""; ?>">
+            </div>
+        </div>
+        <input type="hidden" name="resource_uri" value="<?php print htmlspecialchars($_REQUEST['resource_uri'], ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+        <input type="hidden" name="resource_creation_uri" value="<?php print htmlspecialchars($_REQUEST['resource_creation_uri'], ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+        <input type="hidden" name="generate_codes_uri" value="<?php print htmlspecialchars($_REQUEST['generate_codes_uri'], ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+        <input type="hidden" name="csrf_token" value="<?php print htmlspecialchars($token, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+        <button type="submit" class="btn btn-primary">Add Coupon Code</button>
+    </form>
+    <hr />
+
+    <h2>Add Multiple Coupon Codes</h2>
+    <p>Add one code per line.</p>
+    <form role="form" action="/coupons.php?action=add_multiple_coupon_codes" method="post" class="form-horizontal">
+        <div class="form-group">
+            <label for="codes" class="col-sm-2 control-label">Coupon Code<span class="text-danger">*</span></label>
+            <div class="col-sm-3">
+<textarea class="form-control" id="codes" name="codes" rows="10" cols="70">
+<?php echo isset($_POST['codes']) ? htmlspecialchars($_POST['codes']) : ""; ?>
+</textarea>
+            </div>
+        </div>
+        <input type="hidden" name="resource_uri" value="<?php print htmlspecialchars($_REQUEST['resource_uri'], ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+        <input type="hidden" name="resource_creation_uri" value="<?php print htmlspecialchars($_REQUEST['resource_creation_uri'], ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+        <input type="hidden" name="generate_codes_uri" value="<?php print htmlspecialchars($_REQUEST['generate_codes_uri'], ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+        <input type="hidden" name="csrf_token" value="<?php print htmlspecialchars($token, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+        <button type="submit" class="btn btn-primary">Add Coupon Codes</button>
+    </form>
+    <hr />
+
+    <h2>Automatically Generate Multiple Coupon Codes</h2>
+    <form role="form" action="/coupons.php?action=generate_multiple_coupon_codes" method="post" class="form-horizontal">
+        <div class="form-group">
+            <label for="length" class="col-sm-2 control-label">Code Length</label>
+            <div class="col-sm-3">
+                <input type="text" class="form-control" id="length" name="length" maxlength="200" value="<?php echo isset($_POST['length']) ? htmlspecialchars($_POST['length']) : "6"; ?>">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="number_of_codes" class="col-sm-2 control-label">Number of Codes</label>
+            <div class="col-sm-3">
+                <input type="text" class="form-control" id="number_of_codes" name="number_of_codes" maxnumber_of_codes="200" value="<?php echo isset($_POST['number_of_codes']) ? htmlspecialchars($_POST['number_of_codes']) : "10"; ?>">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="prefix" class="col-sm-2 control-label">Prefix</label>
+            <div class="col-sm-3">
+                <input type="text" class="form-control" id="prefix" name="prefix" maxprefix="200" value="<?php echo isset($_POST['prefix']) ? htmlspecialchars($_POST['prefix']) : ""; ?>">
+            </div>
+        </div>
+        <input type="hidden" name="resource_uri" value="<?php print htmlspecialchars($_REQUEST['resource_uri'], ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+        <input type="hidden" name="resource_creation_uri" value="<?php print htmlspecialchars($_REQUEST['resource_creation_uri'], ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+        <input type="hidden" name="generate_codes_uri" value="<?php print htmlspecialchars($_REQUEST['generate_codes_uri'], ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+        <input type="hidden" name="csrf_token" value="<?php print htmlspecialchars($token, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+        <button type="submit" class="btn btn-primary">Add Coupon Codes</button>
+    </form>
+
+    <?php
+}
+
 
 if ($action == 'add_coupon_form') {
     ?>
@@ -441,31 +564,6 @@ if ($action == 'save_coupon') {
             'exclude_line_item_discounts' => $_POST['exclude_line_item_discounts'],
             'is_taxable' => $_POST['is_taxable'],
         );
-
-        // TODO: rmove this once we push out https://github.com/FoxyCart/hypermedia-api/pull/120
-        if ($data['combinable'] == 'true') {
-            $data['combinable'] = 1;
-        }
-        if ($data['multiple_codes_allowed'] == 'true') {
-            $data['multiple_codes_allowed'] = 1;
-        }
-        if ($data['exclude_category_discounts'] == 'true') {
-            $data['exclude_category_discounts'] = 1;
-        }
-        if ($data['exclude_line_item_discounts'] == 'true') {
-            $data['exclude_line_item_discounts'] = 1;
-        }
-        if ($data['is_taxable'] == 'true') {
-            $data['is_taxable'] = 1;
-        }
-        /*
-        print "<pre>";
-        var_dump($data);
-        var_dump(http_build_query($data));
-        print "</pre>";
-        */
-
-
         $result = $fc->patch($_REQUEST['resource_uri'],$data);
         $errors = array_merge($errors,$fc->getErrors($result));
         if (!count($errors)) {
@@ -578,6 +676,8 @@ if ($action == 'view_coupon') {
     <?php
     $errors = array();
     $resouce_uri = (isset($_REQUEST['resource_uri']) ? $_REQUEST['resource_uri'] : '');
+    $coupon_codes_uri = '';
+    $generate_codes_uri = '';
     if ($resouce_uri == '') {
         $errors[] = 'The required resource_uri is missing. Please click back and try again.';
     }
@@ -590,6 +690,8 @@ if ($action == 'view_coupon') {
             <div class="col-md-6">
             <table class="table">
             <?php
+            $generate_codes_uri = $result['_links']['fx:generate_codes']['href'];
+            $coupon_codes_uri = $result['_links']['fx:coupon_codes']['href'];
             $embedded_data = array();
             $boolean_fields = array('combinable','multiple_codes_allowed','exclude_category_discounts','exclude_line_item_discounts','is_taxable');
             foreach($result as $field => $value) {
@@ -612,12 +714,13 @@ if ($action == 'view_coupon') {
                 ?>
                 <tr><td colspan="2">
                 <h2>Coupon Codes</h2>
+                <form role="form" action="/coupons.php?action=view_coupon_codes" method="post" class="form-horizontal">
+                <input type="hidden" name="resource_uri" value="<?php print htmlspecialchars($resouce_uri, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+                <input type="hidden" name="resource_collection_uri" value="<?php print htmlspecialchars($coupon_codes_uri, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+                <input type="hidden" name="csrf_token" value="<?php print htmlspecialchars($token, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+                <input type="submit" name="submit" class="btn btn-info" value="View All Coupon Codes" />
+                </form><br />
                 <?php
-/*
-print "<pre>";
-var_dump($embedded_data);
-print "</pre>";
-*/
                 foreach($embedded_data as $coupon_code) {
                     foreach($coupon_code as $cc_field => $cc_value) {
                         if ($cc_field == 'code') {
@@ -627,6 +730,9 @@ print "</pre>";
                             print ' (' . $cc_value . ' uses so far)<br />';
                         }
                     }
+                }
+                if (count($embedded_data) == 20) {
+                    print '...(this list may be incomplete)...<br />';
                 }
                 ?>
                 </td>
@@ -640,6 +746,16 @@ print "</pre>";
             <input type="hidden" name="csrf_token" value="<?php print htmlspecialchars($token, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
             <input type="submit" name="submit" class="btn btn-warning" value="Edit <?php print $result['name']; ?>" />
             </form><br />
+            <hr />
+
+            <form role="form" action="/coupons.php?action=add_coupon_code_form" method="post" class="form-horizontal">
+            <input type="hidden" name="resource_uri" value="<?php print htmlspecialchars($resouce_uri, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+            <input type="hidden" name="resource_creation_uri" value="<?php print htmlspecialchars($coupon_codes_uri, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+            <input type="hidden" name="generate_codes_uri" value="<?php print htmlspecialchars($generate_codes_uri, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+            <input type="hidden" name="csrf_token" value="<?php print htmlspecialchars($token, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+            <input type="submit" name="submit" class="btn btn-info" value="Add Coupon Codes" />
+            </form><br />
+
             <a class="btn btn-primary" href="/coupons.php?action=view_coupons">View All Coupons</a>
             </div>
             <?php
@@ -655,6 +771,130 @@ print "</pre>";
         print '</div>';
     }
 }
+
+
+if ($action == 'delete_coupon_code') {
+    $errors = array();
+    if (!isset($_REQUEST['resource_uri'])) {
+        $errors[] = 'The required resource_uri is missing. Please click back and try again.';
+    }
+    if (!count($errors)) {
+        $result = $fc->delete($_REQUEST['resource_uri']);
+        $errors = array_merge($errors,$fc->getErrors($result));
+        print '<h3 class="alert alert-success" role="alert">Coupon Code Deleted</h3>';
+        $action = 'view_coupon_codes';
+    }
+    if (count($errors)) {
+        $action = 'view_coupon_codes';
+        print '<div class="alert alert-danger" role="alert">';
+        print '<h2>Error:</h2>';
+        foreach($errors as $error) {
+            print $error . '<br />';
+        }
+        print '</div>';
+    }
+}
+
+if ($action == 'delete_coupon_code_form') {
+    $errors = array();
+    if (!isset($_REQUEST['resource_uri'])) {
+        $errors[] = 'The required resource_uri is missing. Please click back and try again.';
+    }
+    if (!count($errors)) {
+            ?>
+            <p>Are you sure you want to delete the <code><?php print $_REQUEST['resource_name']; ?></code> coupon code?
+            <form role="form" action="/coupons.php?action=delete_coupon_code" method="post" class="form-horizontal">
+            <input type="hidden" name="resource_uri" value="<?php print htmlspecialchars($_REQUEST['resource_uri'], ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+            <input type="hidden" name="resource_collection_uri" value="<?php print htmlspecialchars($_REQUEST['resource_collection_uri'], ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+            <input type="hidden" name="csrf_token" value="<?php print htmlspecialchars($token, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
+            <input type="submit" name="submit" class="btn btn-danger" value="Yes, Delete It" />
+            </form>
+            <?php
+    }
+    if (count($errors)) {
+        $action = 'view_coupon_codes';
+        print '<div class="alert alert-danger" role="alert">';
+        print '<h2>Error:</h2>';
+        foreach($errors as $error) {
+            print $error . '<br />';
+        }
+        print '</div>';
+    }
+}
+
+
+if ($action == 'view_coupon_codes') {
+    ?>
+    <h2>View Coupon Codes</h2>
+    <?php
+    $errors = array();
+    $resource_collection_uri = isset($_REQUEST['resource_collection_uri']) ? $_REQUEST['resource_collection_uri'] : '';
+    $result = $fc->get($_REQUEST['resource_collection_uri']);
+    $errors = array_merge($errors,$fc->getErrors($result));
+    if (!count($errors)) {
+        ?>
+        <h3>Coupon Codes</h3>
+        <?php
+        print '<p>Displaying ' . $result['returned_items'] . ' (' . ($result['offset']+1) . ' through ' . min($result['total_items'],($result['limit']+$result['offset'])) . ') of ' . $result['total_items'] . ' total coupons.</p>'
+        ?>
+        <nav>
+          <ul class="pagination">
+            <li>
+              <a href="/coupons.php?action=view_coupon_codes&amp;resource_collection_uri=<?php print urlencode($result['_links']['prev']['href']); ?>" aria-label="Previous">
+                <span aria-hidden="true">&laquo;</span>
+              </a>
+            </li>
+            <li>
+              <a href="/coupons.php?action=view_coupon_codes&amp;resource_collection_uri=<?php print urlencode($result['_links']['next']['href']); ?>" aria-label="Next">
+                <span aria-hidden="true">&raquo;</span>
+              </a>
+            </li>
+          </ul>
+        </nav>
+        <table class="table">
+        <tr>
+            <th>Coupon Code</th>
+            <th>Number of Uses to Date</th>
+            <th>Date Created</th>
+            <th>Date Modified</th>
+            <th>&nbsp;</th>
+        </tr>
+        <?php
+        $coupon_uri = '';
+        foreach($result['_embedded']['fx:coupon_codes'] as $coupon_codes) {
+            if ($coupon_uri == '') {
+                $coupon_uri = $coupon_codes['_links']['fx:coupon']['href'];
+            }
+            ?>
+            <tr>
+                <td><?php print $coupon_codes['code']; ?></td>
+                <td><?php print $coupon_codes['number_of_uses_to_date']; ?></td>
+                <td><?php print $coupon_codes['date_created']; ?></td>
+                <td><?php print $coupon_codes['date_modified']; ?></td>
+                <td><a class="btn btn-danger" href="/coupons.php?action=delete_coupon_code_form&amp;resource_collection_uri=<?php print urlencode($resource_collection_uri); ?>&amp;resource_uri=<?php print urlencode($coupon_codes['_links']['self']['href']); ?>&amp;resource_name=<?php print urlencode($coupon_codes['code']); ?>">Delete</a></td>
+            </tr>
+            <?php
+        }
+        ?>
+        </table>
+        <?php
+        if ($coupon_uri != '') {
+            ?>
+            <a class="btn btn-primary" href="/coupons.php?action=view_coupon&amp;resource_uri=<?php print urlencode($coupon_uri); ?>">View Coupon</a></td>
+            <?php
+        }
+    }
+    if (count($errors)) {
+        $action = '';
+        print '<div class="alert alert-danger" role="alert">';
+        print '<h2>Error:</h2>';
+        foreach($errors as $error) {
+            print $error . '<br />';
+        }
+        print '</div>';
+    }
+}
+
 
 if ($action == 'view_coupons') {
     ?>
