@@ -137,6 +137,7 @@ if ($action == 'view_coupons' || $action == 'add_coupon') {
             $errors = array_merge($errors,$fc->getErrors($result));
             if (!count($errors)) {
                 $_SESSION['store_name'] = $result['store_name'];
+                $_SESSION['item_categories_uri'] = $result['_links']['fx:item_categories']['href'];
             }
         }
     }
@@ -236,6 +237,36 @@ if ($action == 'add_coupon') {
         print '</div>';
         $_REQUEST['resource_uri'] = $result['_links']['self']['href'];
         $action = 'view_coupon';
+
+        // add our item category restrictions
+        $category_uris = array();
+        foreach($_POST as $field => $value) {
+            $prefix = strpos($field, 'category_uris_');
+            if ($prefix !== false) {
+                $category_uri = substr($field, strlen('category_uris_'));
+                $category_uris[] = urldecode($category_uri);
+            }
+        }
+        if (count($category_uris)) {
+            // get the fx:coupon_item_categories href
+            $result = $fc->get($_REQUEST['resource_uri']);
+            $errors = array_merge($errors,$fc->getErrors($result));
+            if (!count($errors)) {
+                $coupon_item_categories_uri = $fc->getLink('fx:coupon_item_categories');
+                if ($coupon_item_categories_uri == '') {
+                    $errors[] = 'Unable to obtain fx:coupon_item_categories href';
+                } else {
+                    foreach($category_uris as $category_uri) {
+                        $data = array(
+                            'coupon_uri' => $_REQUEST['resource_uri'],
+                            'item_category_uri' => $category_uri
+                            );
+                        $result = $fc->post($coupon_item_categories_uri, $data);
+                        $errors = array_merge($errors,$fc->getErrors($result));
+                    }
+                }
+            }
+        }
     }
     if (count($errors)) {
         $action = 'add_coupon_form';
@@ -398,12 +429,21 @@ if ($action == 'add_coupon_code_form') {
         <input type="hidden" name="csrf_token" value="<?php print htmlspecialchars($token, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
         <button type="submit" class="btn btn-primary">Add Coupon Codes</button>
     </form>
-
     <?php
 }
 
 
 if ($action == 'add_coupon_form') {
+    // let's get the list of item categories
+    $errors = array();
+    $item_categories = array();
+    $result = $fc->get($_SESSION['item_categories_uri']);
+    $errors = array_merge($errors,$fc->getErrors($result));
+    if (!count($errors)) {
+        foreach($result['_embedded']['fx:item_categories'] as $item_category) {
+            $item_categories[] = $item_category;
+        }
+    }
     ?>
     <h2>Add Coupon</h2>
     <form role="form" action="/coupons.php?action=add_coupon" method="post" class="form-horizontal">
@@ -471,70 +511,100 @@ if ($action == 'add_coupon_form') {
             </div>
         </div>
         <div class="form-group">
-            <label for="combinable_yes" class="col-sm-2 control-label">Is Combinable?</label>
-            <div class="col-sm-3">
-                <label class="radio-inline">
-                    <?php $checked = (isset($_POST['combinable']) && $_POST['combinable'] == 'true') ? ' checked="checked"' : ''; ?>
-                    <input<?php print $checked; ?> type="radio" class="form-control" id="combinable_true" name="combinable" value="true" /> Yes
-                </label>
-                <label class="radio-inline">
-                    <?php $checked = (!isset($_POST['combinable']) || $_POST['combinable'] == 'false') ? ' checked="checked"' : ''; ?>
-                    <input<?php print $checked; ?> type="radio" class="form-control" id="combinable_false" name="combinable" value="false" /> No
-                </label>
+            <div class="radio">
+                <label for="combinable_yes" class="col-sm-2 control-label">Is Combinable?</label>
+                <div class="col-sm-3">
+                    <label class="radio-inline">
+                        <?php $checked = (isset($_POST['combinable']) && $_POST['combinable'] == 'true') ? ' checked="checked"' : ''; ?>
+                        <input<?php print $checked; ?> type="radio" id="combinable_true" name="combinable" value="true" /> Yes
+                    </label>
+                    <label class="radio-inline">
+                        <?php $checked = (!isset($_POST['combinable']) || $_POST['combinable'] == 'false') ? ' checked="checked"' : ''; ?>
+                        <input<?php print $checked; ?> type="radio" id="combinable_false" name="combinable" value="false" /> No
+                    </label>
+                </div>
             </div>
         </div>
         <div class="form-group">
-            <label for="multiple_codes_allowed_yes" class="col-sm-2 control-label">Multiple Codes Allowed?</label>
-            <div class="col-sm-3">
-                <label class="radio-inline">
-                    <?php $checked = (isset($_POST['multiple_codes_allowed']) && $_POST['multiple_codes_allowed'] == 'true') ? ' checked="checked"' : ''; ?>
-                    <input<?php print $checked; ?> type="radio" class="form-control" id="multiple_codes_allowed_true" name="multiple_codes_allowed" value="true" /> Yes
-                </label>
-                <label class="radio-inline">
-                    <?php $checked = (!isset($_POST['multiple_codes_allowed']) || $_POST['multiple_codes_allowed'] == 'false') ? ' checked="checked"' : ''; ?>
-                    <input<?php print $checked; ?> type="radio" class="form-control" id="multiple_codes_allowed_false" name="multiple_codes_allowed" value="false" /> No
-                </label>
+            <div class="radio">
+                <label for="multiple_codes_allowed_yes" class="col-sm-2 control-label">Multiple Codes Allowed?</label>
+                <div class="col-sm-3">
+                    <label class="radio-inline">
+                        <?php $checked = (isset($_POST['multiple_codes_allowed']) && $_POST['multiple_codes_allowed'] == 'true') ? ' checked="checked"' : ''; ?>
+                        <input<?php print $checked; ?> type="radio" id="multiple_codes_allowed_true" name="multiple_codes_allowed" value="true" /> Yes
+                    </label>
+                    <label class="radio-inline">
+                        <?php $checked = (!isset($_POST['multiple_codes_allowed']) || $_POST['multiple_codes_allowed'] == 'false') ? ' checked="checked"' : ''; ?>
+                        <input<?php print $checked; ?> type="radio" id="multiple_codes_allowed_false" name="multiple_codes_allowed" value="false" /> No
+                    </label>
+                </div>
             </div>
         </div>
         <div class="form-group">
-            <label for="exclude_category_discounts_yes" class="col-sm-2 control-label">Exclude Category Discounts?</label>
-            <div class="col-sm-3">
-                <label class="radio-inline">
-                    <?php $checked = (isset($_POST['exclude_category_discounts']) && $_POST['exclude_category_discounts'] == 'true') ? ' checked="checked"' : ''; ?>
-                    <input<?php print $checked; ?> type="radio" class="form-control" id="exclude_category_discounts_true" name="exclude_category_discounts" value="true" /> Yes
-                </label>
-                <label class="radio-inline">
-                    <?php $checked = (!isset($_POST['exclude_category_discounts']) || $_POST['exclude_category_discounts'] == 'false') ? ' checked="checked"' : ''; ?>
-                    <input<?php print $checked; ?> type="radio" class="form-control" id="exclude_category_discounts_false" name="exclude_category_discounts" value="false" /> No
-                </label>
+            <div class="radio">
+                <label for="exclude_category_discounts_yes" class="col-sm-2 control-label">Exclude Category Discounts?</label>
+                <div class="col-sm-3">
+                    <label class="radio-inline">
+                        <?php $checked = (isset($_POST['exclude_category_discounts']) && $_POST['exclude_category_discounts'] == 'true') ? ' checked="checked"' : ''; ?>
+                        <input<?php print $checked; ?> type="radio" id="exclude_category_discounts_true" name="exclude_category_discounts" value="true" /> Yes
+                    </label>
+                    <label class="radio-inline">
+                        <?php $checked = (!isset($_POST['exclude_category_discounts']) || $_POST['exclude_category_discounts'] == 'false') ? ' checked="checked"' : ''; ?>
+                        <input<?php print $checked; ?> type="radio" id="exclude_category_discounts_false" name="exclude_category_discounts" value="false" /> No
+                    </label>
+                </div>
             </div>
         </div>
         <div class="form-group">
-            <label for="exclude_line_item_discounts_yes" class="col-sm-2 control-label">Exclude Line Item Discounts?</label>
-            <div class="col-sm-3">
-                <label class="radio-inline">
-                    <?php $checked = (isset($_POST['exclude_line_item_discounts']) && $_POST['exclude_line_item_discounts'] == 'true') ? ' checked="checked"' : ''; ?>
-                    <input<?php print $checked; ?> type="radio" class="form-control" id="exclude_line_item_discounts_true" name="exclude_line_item_discounts" value="true" /> Yes
-                </label>
-                <label class="radio-inline">
-                    <?php $checked = (!isset($_POST['exclude_line_item_discounts']) || $_POST['exclude_line_item_discounts'] == 'false') ? ' checked="checked"' : ''; ?>
-                    <input<?php print $checked; ?> type="radio" class="form-control" id="exclude_line_item_discounts_false" name="exclude_line_item_discounts" value="false" /> No
-                </label>
+            <div class="radio">
+                <label for="exclude_line_item_discounts_yes" class="col-sm-2 control-label">Exclude Line Item Discounts?</label>
+                <div class="col-sm-3">
+                    <label class="radio-inline">
+                        <?php $checked = (isset($_POST['exclude_line_item_discounts']) && $_POST['exclude_line_item_discounts'] == 'true') ? ' checked="checked"' : ''; ?>
+                        <input<?php print $checked; ?> type="radio" id="exclude_line_item_discounts_true" name="exclude_line_item_discounts" value="true" /> Yes
+                    </label>
+                    <label class="radio-inline">
+                        <?php $checked = (!isset($_POST['exclude_line_item_discounts']) || $_POST['exclude_line_item_discounts'] == 'false') ? ' checked="checked"' : ''; ?>
+                        <input<?php print $checked; ?> type="radio" id="exclude_line_item_discounts_false" name="exclude_line_item_discounts" value="false" /> No
+                    </label>
+                </div>
             </div>
         </div>
         <div class="form-group">
-            <label for="is_taxable_yes" class="col-sm-2 control-label">Is Taxable?</label>
-            <div class="col-sm-3">
-                <label class="radio-inline">
-                    <?php $checked = (isset($_POST['is_taxable']) && $_POST['is_taxable'] == 'true') ? ' checked="checked"' : ''; ?>
-                    <input<?php print $checked; ?> type="radio" class="form-control" id="is_taxable_true" name="is_taxable" value="true" /> Yes
-                </label>
-                <label class="radio-inline">
-                    <?php $checked = (!isset($_POST['is_taxable']) || $_POST['is_taxable'] == 'false') ? ' checked="checked"' : ''; ?>
-                    <input<?php print $checked; ?> type="radio" class="form-control" id="is_taxable_false" name="is_taxable" value="false" /> No
-                </label>
+            <div class="radio">
+                <label for="is_taxable_yes" class="col-sm-2 control-label">Is Taxable?</label>
+                <div class="col-sm-3">
+                    <label class="radio-inline">
+                        <?php $checked = (isset($_POST['is_taxable']) && $_POST['is_taxable'] == 'true') ? ' checked="checked"' : ''; ?>
+                        <input<?php print $checked; ?> type="radio" id="is_taxable_true" name="is_taxable" value="true" /> Yes
+                    </label>
+                    <label class="radio-inline">
+                        <?php $checked = (!isset($_POST['is_taxable']) || $_POST['is_taxable'] == 'false') ? ' checked="checked"' : ''; ?>
+                        <input<?php print $checked; ?> type="radio" id="is_taxable_false" name="is_taxable" value="false" /> No
+                    </label>
+                </div>
             </div>
         </div>
+        <h3>Restrict by Item Category</h3>
+        <p>Leave everything unchecked to set no restrictions and make this coupon available to all categories.</p>
+        <?php
+        foreach($item_categories as $category) {
+            $category_uri = urlencode($category['_links']['self']['href']);
+            ?>
+        <div class="form-group">
+            <div class="checkbox">
+                <div class="col-sm-3">
+                    <label>
+                        <?php $checked = (isset($_POST['category_uris_' . $category_uri]) && $_POST['category_uris_' . $category_uri] == 'true') ? ' checked="checked"' : ''; ?>
+                        <input<?php print $checked; ?> type="checkbox" id="category_uris_<?php print $category_uri; ?>" name="category_uris_<?php print $category_uri; ?>" value="true" />
+                        <?php print $category['code'] . ': ' . $category['name']; ?>
+                    </label>
+                </div>
+            </div>
+            </div>
+            <?php
+        }
+        ?>
         <input type="hidden" name="csrf_token" value="<?php print htmlspecialchars($token, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
         <button type="submit" class="btn btn-primary">Add Coupon</button>
     </form>
@@ -568,6 +638,58 @@ if ($action == 'save_coupon') {
         $errors = array_merge($errors,$fc->getErrors($result));
         if (!count($errors)) {
             $action = 'view_coupon';
+
+            // add our item category restrictions
+            $category_uris_to_add = array();
+            $category_uris_to_remove = array();
+            $original_values = array();
+            foreach($_POST as $field => $value) {
+                $prefix = strpos($field, 'category_uris_');
+                if ($prefix !== false) {
+                    $category_uri = substr($field, strlen('category_uris_'));
+                    $category_uris_to_add[$category_uri] = $category_uri;
+                }
+                $prefix = strpos($field, 'original_c_uri_value_');
+                if ($prefix !== false) {
+                    $category_uri = substr($field, strlen('original_c_uri_value_'));
+                    if ($value != '') {
+                        $original_values[$category_uri] = $value;
+                    }
+                }
+            }
+            foreach($original_values as $category_uri => $coupon_item_category_uri) {
+                if (!array_key_exists($category_uri, $category_uris_to_add)) {
+                    $category_uris_to_remove[] = $coupon_item_category_uri;
+                } else {
+                    unset($category_uris_to_add[$category_uri]);
+                }
+            }
+            if (count($category_uris_to_remove)) {
+                foreach($category_uris_to_remove as $coupon_item_category_uri) {
+                    $result = $fc->delete(urldecode($coupon_item_category_uri));
+                    $errors = array_merge($errors,$fc->getErrors($result));
+                }
+            }
+            if (count($category_uris_to_add)) {
+                // get the fx:coupon_item_categories href
+                $result = $fc->get($_REQUEST['resource_uri']);
+                $errors = array_merge($errors,$fc->getErrors($result));
+                if (!count($errors)) {
+                    $coupon_item_categories_uri = $fc->getLink('fx:coupon_item_categories');
+                    if ($coupon_item_categories_uri == '') {
+                        $errors[] = 'Unable to obtain fx:coupon_item_categories href';
+                    } else {
+                        foreach($category_uris_to_add as $category_uri) {
+                            $data = array(
+                                'coupon_uri' => $_REQUEST['resource_uri'],
+                                'item_category_uri' => urldecode($category_uri)
+                                );
+                            $result = $fc->post($coupon_item_categories_uri, $data);
+                            $errors = array_merge($errors,$fc->getErrors($result));
+                        }
+                    }
+                }
+            }
         }
     }
     if (count($errors)) {
@@ -585,7 +707,16 @@ if ($action == 'edit_coupon_form') {
     ?>
     <h2>Edit Coupon</h2>
     <?php
+    // let's get the list of item categories
     $errors = array();
+    $item_categories = array();
+    $result = $fc->get($_SESSION['item_categories_uri']);
+    $errors = array_merge($errors,$fc->getErrors($result));
+    if (!count($errors)) {
+        foreach($result['_embedded']['fx:item_categories'] as $item_category) {
+            $item_categories[] = $item_category;
+        }
+    }
     if (!isset($_REQUEST['resource_uri'])) {
         $errors[] = 'The required resource_uri is missing. Please click back and try again.';
     }
@@ -593,6 +724,7 @@ if ($action == 'edit_coupon_form') {
         $result = $fc->get($_REQUEST['resource_uri']);
         $errors = array_merge($errors,$fc->getErrors($result));
         if (!count($errors)) {
+            $coupon_item_categories_uri = $result['_links']['fx:coupon_item_categories']['href'];
             ?>
             <form role="form" action="/coupons.php?action=save_coupon" method="post" class="form-horizontal">
             <?php
@@ -620,16 +752,18 @@ if ($action == 'edit_coupon_form') {
                     } elseif (in_array($field, $boolean_fields)) {
                         ?>
                         <div class="form-group">
-                            <label for="combinable_yes" class="col-sm-2 control-label"><?php print ucwords(str_replace('_',' ',$field)); ?>?</label>
-                            <div class="col-sm-3">
-                                <label class="radio-inline">
-                                    <?php $checked = ($value) ? ' checked="checked"' : ''; ?>
-                                    <input<?php print $checked; ?> type="radio" class="form-control" id="<?php print $field; ?>_true" name="<?php print $field; ?>" value="true" /> Yes
-                                </label>
-                                <label class="radio-inline">
-                                    <?php $checked = (!$value) ? ' checked="checked"' : ''; ?>
-                                    <input<?php print $checked; ?> type="radio" class="form-control" id="<?php print $field; ?>_false" name="<?php print $field; ?>" value="false" /> No
-                                </label>
+                            <div class="radio">
+                                <label for="<?php print $field; ?>_true" class="col-sm-2 control-label"><?php print ucwords(str_replace('_',' ',$field)); ?>?</label>
+                                <div class="col-sm-3">
+                                    <label class="radio-inline">
+                                        <?php $checked = ($value) ? ' checked="checked"' : ''; ?>
+                                        <input<?php print $checked; ?> type="radio" id="<?php print $field; ?>_true" name="<?php print $field; ?>" value="true" /> Yes
+                                    </label>
+                                    <label class="radio-inline">
+                                        <?php $checked = (!$value) ? ' checked="checked"' : ''; ?>
+                                        <input<?php print $checked; ?> type="radio" id="<?php print $field; ?>_false" name="<?php print $field; ?>" value="false" /> No
+                                    </label>
+                                </div>
                             </div>
                         </div>
                         <?php
@@ -650,6 +784,50 @@ if ($action == 'edit_coupon_form') {
                         <?php
                     }
                 }
+            }
+            // get category associations
+            $result = $fc->get($coupon_item_categories_uri, array('limit' => 300));
+            $errors = array_merge($errors,$fc->getErrors($result));
+            $applied_categories = array();
+            $coupon_item_categories = array();
+            if (!count($errors)) {
+                foreach($result['_embedded']['fx:coupon_item_categories'] as $coupon_item_category) {
+                    foreach($item_categories as $category) {
+                        $category_uri = $category['_links']['self']['href'];
+                        if ($coupon_item_category['item_category_uri'] == $category_uri) {
+                            $applied_categories[] = $category_uri;
+                            $coupon_item_categories[urlencode($category_uri)] = urlencode($coupon_item_category['_links']['self']['href']);
+                        }
+                    }
+                }
+            }
+            ?>
+            <h3>Restrict by Item Category</h3>
+            <p>Leave everything unchecked to set no restrictions and make this coupon available to all categories.</p>
+            <?php
+            foreach($item_categories as $category) {
+                $category_uri = $category['_links']['self']['href'];
+                $is_checked = in_array($category_uri, $applied_categories);
+                $category_uri = urlencode($category_uri);
+                ?>
+                <input type="hidden" id="original_c_uri_value_<?php print $category_uri; ?>" name="original_c_uri_value_<?php print $category_uri; ?>" value="<?php print (($is_checked) ? $coupon_item_categories[$category_uri] : ''); ?>" />
+                <?php
+                if (isset($_POST['category_uris_' . $category_uri])) {
+                    $is_checked = ($_POST['category_uris_' . $category_uri] == 'true');
+                }
+                ?>
+                <div class="form-group">
+                    <div class="checkbox">
+                        <div class="col-sm-3">
+                            <label>
+                                <?php $checked = ($is_checked) ? ' checked="checked"' : ''; ?>
+                                <input<?php print $checked; ?> type="checkbox" id="category_uris_<?php print $category_uri; ?>" name="category_uris_<?php print $category_uri; ?>" value="<?php print $category_uri; ?>" />
+                                <?php print $category['code'] . ': ' . $category['name']; ?>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <?php
             }
             ?>
                 <input type="hidden" name="resource_uri" value="<?php print htmlspecialchars($_REQUEST['resource_uri'], ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
@@ -678,20 +856,32 @@ if ($action == 'view_coupon') {
     $resouce_uri = (isset($_REQUEST['resource_uri']) ? $_REQUEST['resource_uri'] : '');
     $coupon_codes_uri = '';
     $generate_codes_uri = '';
+    $coupon_name = '';
     if ($resouce_uri == '') {
         $errors[] = 'The required resource_uri is missing. Please click back and try again.';
     }
     if (!count($errors)) {
+        $item_categories = array();
+        $result = $fc->get($_SESSION['item_categories_uri']);
+        $errors = array_merge($errors,$fc->getErrors($result));
+        if (!count($errors)) {
+            foreach($result['_embedded']['fx:item_categories'] as $item_category) {
+                $item_categories[] = $item_category;
+            }
+        }
         $result = $fc->get($resouce_uri,array('zoom' => 'coupon_codes'));
         $errors = array_merge($errors,$fc->getErrors($result));
         if (!count($errors)) {
+            $coupon_name = $result['name'];
             ?>
-            <h3><?php print $result['name']; ?></h3>
+            <h3><?php print $coupon_name; ?></h3>
             <div class="col-md-6">
             <table class="table">
             <?php
             $generate_codes_uri = $result['_links']['fx:generate_codes']['href'];
             $coupon_codes_uri = $result['_links']['fx:coupon_codes']['href'];
+            $coupon_item_categories_uri = $result['_links']['fx:coupon_item_categories']['href'];
+
             $embedded_data = array();
             $boolean_fields = array('combinable','multiple_codes_allowed','exclude_category_discounts','exclude_line_item_discounts','is_taxable');
             foreach($result as $field => $value) {
@@ -709,6 +899,35 @@ if ($action == 'view_coupon') {
                 if ($field == '_embedded') {
                     $embedded_data = $value['fx:coupon_codes'];
                 }
+            }
+            // get category associations
+            $result = $fc->get($coupon_item_categories_uri, array('limit' => 300));
+            $errors = array_merge($errors,$fc->getErrors($result));
+            $applied_categories = array();
+            if (!count($errors)) {
+                foreach($result['_embedded']['fx:coupon_item_categories'] as $coupon_item_category) {
+                    foreach($item_categories as $category) {
+                        $category_uri = $category['_links']['self']['href'];
+                        if ($coupon_item_category['item_category_uri'] == $category_uri) {
+                            $applied_categories[] = $category['code'] . ': ' . $category['name'];
+                        }
+                    }
+                }
+                ?>
+                <tr><td colspan="2">
+                <h3>Item Category Restrictions</h3>
+                <?php
+                if (!count($applied_categories)) {
+                    print '<p>Applies to all categories</p>';
+                } else {
+                    foreach ($applied_categories as $applied_category) {
+                        print '<p>' . $applied_category . '</p>';
+                    }
+                }
+                ?>
+                </td>
+                </tr>
+                <?php
             }
             if (count($embedded_data)) {
                 ?>
@@ -744,7 +963,7 @@ if ($action == 'view_coupon') {
             <form role="form" action="/coupons.php?action=edit_coupon_form" method="post" class="form-horizontal">
             <input type="hidden" name="resource_uri" value="<?php print htmlspecialchars($resouce_uri, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
             <input type="hidden" name="csrf_token" value="<?php print htmlspecialchars($token, ENT_QUOTES | ENT_HTML5, 'UTF-8'); ?>" />
-            <input type="submit" name="submit" class="btn btn-warning" value="Edit <?php print $result['name']; ?>" />
+            <input type="submit" name="submit" class="btn btn-warning" value="Edit <?php print $coupon_name; ?>" />
             </form><br />
             <hr />
 
@@ -990,6 +1209,7 @@ if (isset($_SESSION['access_token_expires']) && $fc->getAccessTokenExpires() != 
         $_SESSION['access_token_expires'] = $fc->getAccessTokenExpires();
     }
 }
+
 /*
 if ($action != 'logout' && $fc->getAccessToken() != '') {
     print '<footer class="text-muted">Authenticated: ';
@@ -1007,6 +1227,7 @@ if ($action != 'logout' && $fc->getAccessToken() != '') {
     print '</footer>';
 }
 */
+
 ?>
 </div>
 </body>
