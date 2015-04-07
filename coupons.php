@@ -22,7 +22,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : '';
   <div class="container">
     <a class="navbar-brand" href="/">Foxy hAPI Coupon Builder Example</a>
     <ul class="nav navbar-nav">
-      <li><a href="/coupons.php?action=">Home</a></li>
+      <li><a href="/?action=">Home</a></li>
       <li><a target="_blank" href="https://api<?php print ($fc->getUseSandbox() ? '-sandbox' : ''); ?>.foxycart.com/hal-browser/browser.html">HAL Browser</a></li>
       <li><a href="/coupons.php?action=logout">Logout</a></li>
         <?php
