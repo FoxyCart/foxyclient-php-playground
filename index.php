@@ -14,9 +14,10 @@
     <div class="container">
         <h1>Welcome to the FoxyClient Playground!</h1>
         <p>
-            The following examples are available for your pleaasure:
+            The following examples are available for your pleasure:
             <ul>
                 <li><a href="/coupons.php">Coupons</a></li>
+                <li><a href="/item_categories.php">Item Categories</a></li>
             </ul>
         </p>
     </div>
